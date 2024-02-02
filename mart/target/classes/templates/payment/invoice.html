@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice</title>
+    <link rel="shortcut icon" href="https://minimart.com.bd/wp-content/uploads/2023/05/325409173_837305520898040_171445792183026749_n.jpg" type="image/x-icon">
+
+    <link th:href="@{/css/product/invoice.css}" rel="stylesheet" />
+    <link rel="stylesheet" href="https://kendo.cdn.telerik.com/themes/7.0.2/default/default-main.css">
+</head>
+
+<body>
+    <section class="actions">
+        <a th:href="@{/product}" class="button" style="background-color: red;">Back</a>
+        <a href="#" id="submit" class="button" style="background-color: red;">Submit</a>
+        <a href="#" class="button" style="background-color: rgb(0, 48, 136);" onclick="print()">Print</a>
+    </section>
+    <div class="invoice-box">
+        <table cellpadding="0" cellspacing="0">
+            <tr class="top">
+                <td colspan="4">
+                    <table>
+                        <tr>
+                            <td class="title">
+                                <img src="https://minimart.com.bd/wp-content/uploads/2023/05/325409173_837305520898040_171445792183026749_n.jpg" style="width:100%; max-width:80px;">
+                            </td>
+
+                            <td class="detail">
+                                <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=s" style="width: 70px;" alt="">
+                                <br>Invoice #: <input class="invoice_id" type="text" disabled />
+                                <br>Date: <input class="date" type="text" disabled />
+                                <br>Customer Name: <b><input class="customer" type="text" /></b>
+                                <br>Cashier: <input class="cashier" type="text" disabled />
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <tr class="information">
+                <td colspan="4">
+                    <table>
+                        <tr>
+                            <td>
+                                Mini Mart.<br> Phnom Penh<br> Kampuchea Krom Bvl
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+
+            <tr class="heading">
+                <td>
+                    Item
+                </td>
+
+                <td>
+                    Unit Price
+                </td>
+
+                <td>
+                    Quantity
+                </td>
+
+                <td>
+                    Total
+                </td>
+            </tr>
+
+            <tr class="item">
+                <td>
+                    <input class="product" value="" />
+                </td>
+
+                <td>
+                    $ <input class="price" type="number" value="" />
+                </td>
+
+                <td>
+                    <input class="quantity" type="number" value="" />
+                </td>
+
+                <td>
+                    <span class="total">$ 00.00</span>
+                </td>
+            </tr>
+
+            <tr>
+                <td colspan="4">
+                    <button class="btn-add-row">Add row</button>
+                </td>
+            </tr>
+
+            <tr class="total">
+                <td colspan="3"></td>
+                <td>
+                    Grand Total: $ 00.00
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://kendo.cdn.telerik.com/2023.3.1114/js/kendo.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        if (!sessionStorage.getItem("username")) {
+            window.location.href = "/account/login";
+        }
+        $(".cashier").val(sessionStorage.getItem("username"))
+
+        var products = $(".product").kendoDropDownList({
+            optionLabel: "Select product...",
+            dataTextField: "productName",
+            dataValueField: "id",
+            dataSource: []
+        }).data("kendoDropDownList");
+
+        $(".product").on("change", function () {
+            $.ajax({
+                url: "http://localhost:8888/api/product/price/1",
+                method: "GET",
+                success: function (data) {
+                    console.log($(".product").val())
+                    $(".price").val(data.id)
+                },
+                error: function () {
+                }
+            });
+        })
+
+        $.ajax({
+            url: "http://localhost:8888/api/products",
+            method: "GET",
+            success: function (data) {
+                products.setDataSource(data);
+            },
+            error: function () {
+            }
+        });
+
+        $('#submit').on("click", function (e) {
+            e.preventDefault();
+            var jsonData = [];
+
+            $('tr.item').each(function () {
+                var rowValues = [];
+                $(this).find('input, span').each(function () {
+                    var value = $(this).val() || $(this).text();
+                    rowValues.push(value);
+                });
+
+                var payment = {
+                    productName: rowValues[0],
+                    quantity: parseInt(rowValues[2]),
+                    unitPrice: rowValues[1],
+                    cashier: sessionStorage.getItem("username"),
+                    customerName: $(".customer").val()
+                };
+
+                jsonData.push(payment);
+            });
+
+            $.ajax({
+                type: 'POST',
+                url: "/product/payment/save",
+                contentType: 'application/json',
+                data: JSON.stringify(jsonData),
+                success: function (response) {
+                    Swal.fire({
+                        icon: "success",
+                        title: response,
+                        showCancelButton: false,
+                        confirmButtonText: "Ok"
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            window.location.href = "/product";
+                        }
+                    });
+                },
+                error: function (xhr, status, error) {
+                    Swal.fire({
+                        icon: "error",
+                        title: xhr.responseText,
+                        showCancelButton: false,
+                        confirmButtonText: "Back to List"
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            window.location.href = "/product";
+                        }
+                    });
+                }
+            });
+        });
+
+        $('table').on('mouseup keyup', 'input[type=number]', () => calculateTotals());
+
+        $('.btn-add-row').on('click', () => {
+            const $lastRow = $('.item:last');
+            const $newRow = $lastRow.clone();
+
+            $newRow.find('input').val('');
+            $newRow.find('td:last').text('$0.00');
+            $newRow.insertAfter($lastRow);
+
+            $newRow.find('input:first').focus();
+        });
+
+        function getData() {
+            var values = [];
+
+            $('tr.item').each(function () {
+                var rowValues = [];
+                $(this).find('input, span').each(function () {
+                    var value = $(this).val() || $(this).text();
+                    rowValues.push(value);
+                });
+                values.push(rowValues);
+            });
+        }
+        getData();
+        calculateTotals()
+        function calculateTotals() {
+            const subtotals = $('.item').map((idx, val) => calculateSubtotal(val)).get();
+            const total = subtotals.reduce((a, v) => a + Number(v), 0);
+            $('.total td:eq(1)').text(formatAsCurrency(total));
+        }
+
+        function calculateSubtotal(row) {
+            const $row = $(row);
+            const inputs = $row.find('input');
+            const subtotal = inputs[1].value * inputs[2].value;
+
+            $row.find('td:last').text(formatAsCurrency(subtotal));
+
+            return subtotal;
+        }
+
+        function formatAsCurrency(amount) {
+            return `$ ${Number(amount).toFixed(2)}`;
+        }
+    </script>
+</body>
+
+</html>
