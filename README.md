@@ -1,3 +1,5 @@
+#Query for MySQL
+
 CREATE DATABASE db_mart;
 
 CREATE TABLE tbl_user(
