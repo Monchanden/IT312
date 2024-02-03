@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import com.spring_boot.mart.product.entity.Payment;
 import com.spring_boot.mart.product.entity.Product;
 import com.spring_boot.mart.product.repository.ProductRepository;
+import com.spring_boot.mart.product.repository.PaymentRepository;
 import com.spring_boot.mart.product.service.PaymentService;
 import com.spring_boot.mart.product.service.impl.ProductServiceImpl;
 
@@ -26,6 +27,8 @@ public class ProductController {
     ProductServiceImpl productService;
     @Autowired
     ProductRepository productRepository;
+    @Autowired
+    PaymentRepository paymentRepository;
     @Autowired
     PaymentService paymentService;
 
@@ -51,6 +54,19 @@ public class ProductController {
         return "product/index";
     }
 
+    @GetMapping("/soldproduct")
+    public String allSoldProducts(Model model) {
+        List<Payment> payments = paymentRepository.findAll();
+        model.addAttribute("payments", payments);
+        return "payment/soldproduct";
+    }
+
+    @GetMapping("/soldproduct/detail/{id}")
+    public String soldProductDetail(@PathVariable Long id, Model model) {
+        Optional<Payment> payments = paymentRepository.findById(id);
+        model.addAttribute("payments", payments);
+        return "payment/detail";
+    }
     @GetMapping("/detail/{id}")
     public String detail(@PathVariable Long id, Model model) {
         Optional<Product> products = productRepository.findById(id);
