@@ -88,7 +88,7 @@
           <td>$ <input class="price" type="number" value="" /></td>
 
           <td>
-            <input class="quantity" type="number" value="" />
+            <input class="quantity" type="number" value="" min="0" />
           </td>
 
           <td>
@@ -152,6 +152,40 @@
           },
           error: function () {},
         });
+        $.ajax({
+          url: "http://localhost:8888/api/product/quantity/" + product,
+          method: "GET",
+          success: function (data) {
+            var maxQuantity = data[0].id;
+
+            if (maxQuantity == 0) {
+              // Find the parent td, then find or create a span for the out of stock message
+              var quantityTd = currentRow.find(".quantity").parent();
+              var outOfStockSpan = quantityTd.find(".out-of-stock");
+              if (outOfStockSpan.length === 0) {
+                outOfStockSpan = $("<span>")
+                  .addClass("out-of-stock")
+                  .text("Out of stock")
+                  .css("color", "red");
+                quantityTd.append(outOfStockSpan);
+              } else {
+                outOfStockSpan.show(); // Ensure the out of stock message is visible
+              }
+              currentRow.find(".quantity").hide(); // Hide the quantity input
+            } else {
+              // If the product is available, set the max quantity and show the input field
+              currentRow.find(".quantity").attr("max", maxQuantity).show();
+              currentRow
+                .find(".quantity")
+                .parent()
+                .find(".out-of-stock")
+                .hide(); // Hide the out of stock message if it was previously displayed
+            }
+          },
+          error: function () {
+            // Handle error if necessary
+          },
+        });
       });
 
       $.ajax({
@@ -166,62 +200,104 @@
       $("#submit").on("click", function (e) {
         e.preventDefault();
         var jsonData = [];
-
+        // Check if customer name is provided
+        var customerName = $(".customer").val();
+        if (!customerName.trim()) {
+          Swal.fire({
+            icon: "warning",
+            title: "Please enter customer name",
+            showCancelButton: false,
+            confirmButtonText: "OK",
+          });
+          return;
+        }
+        var valid = true;
         $("tr.item").each(function () {
           var rowValues = [];
-          $(this)
-            .find("input, span")
-            .each(function () {
-              var value = $(this).val();
+          var $this = $(this);
+          $this.find("input, span").each(function () {
+            var value = $(this).val();
+            if (value) {
+              rowValues.push(value);
+            }
+          });
+          var productName = rowValues[0];
+          var quantity = parseInt(rowValues[2]);
+          var unitPrice = parseFloat(rowValues[1]);
+          var total = unitPrice * quantity;
+          var productID = products.dataSource
+            .data()
+            .find((p) => p.productName === productName).id;
 
-              // Only push non-empty values into rowValues
-              if (value) {
-                rowValues.push(value);
+          // Check if the product quantity is sufficient
+          $.ajax({
+            url: "http://localhost:8888/api/product/quantity/" + productID,
+            method: "GET",
+            async: false, // Make the request synchronous to ensure validation completes before proceeding
+            success: function (data) {
+              var maxQuantity = data[0].id;
+              if (maxQuantity < quantity) {
+                Swal.fire({
+                  icon: "error",
+                  title: `Insufficient quantity for ${productName}`,
+                  showCancelButton: false,
+                  confirmButtonText: "OK",
+                });
+                valid = false;
+                return false; // Break the loop if any product has insufficient quantity
               }
-            });
+            },
+            error: function () {
+              // Handle error if necessary
+            },
+          });
 
-          console.log(rowValues);
+          if (!valid) return false; // Break the loop if any product has insufficient quantity
+
           var payment = {
-            productName: rowValues[0],
-            quantity: parseInt(rowValues[2]),
-            unitPrice: rowValues[1],
+            productName: productName,
+            quantity: quantity,
+            unitPrice: unitPrice,
+            total: total,
             cashier: sessionStorage.getItem("username"),
             customerName: $(".customer").val(),
           };
-
           jsonData.push(payment);
         });
-        console.log(jsonData);
-        $.ajax({
-          type: "POST",
-          url: "/product/payment/save",
-          contentType: "application/json",
-          data: JSON.stringify(jsonData),
-          success: function (response) {
-            Swal.fire({
-              icon: "success",
-              title: response,
-              showCancelButton: false,
-              confirmButtonText: "Ok",
-            }).then((result) => {
-              if (result.isConfirmed) {
-                window.location.href = "/product";
-              }
-            });
-          },
-          error: function (xhr, status, error) {
-            Swal.fire({
-              icon: "error",
-              title: xhr.responseText,
-              showCancelButton: false,
-              confirmButtonText: "Back to List",
-            }).then((result) => {
-              if (result.isConfirmed) {
-                window.location.href = "/product";
-              }
-            });
-          },
-        });
+
+        if (valid) {
+          // Proceed with payment submission
+          $.ajax({
+            type: "POST",
+            url: "/product/payment/save",
+            contentType: "application/json",
+            data: JSON.stringify(jsonData),
+            success: function (response) {
+              Swal.fire({
+                icon: "success",
+                title: response,
+                showCancelButton: false,
+                confirmButtonText: "Ok",
+              }).then((result) => {
+                if (result.isConfirmed) {
+                  window.location.href = "/product";
+                }
+              });
+            },
+            error: function (xhr, status, error) {
+              Swal.fire({
+                icon: "error",
+                title: xhr.responseText,
+                showCancelButton: false,
+                confirmButtonText: "Back to List",
+              }).then((result) => {
+                if (result.isConfirmed) {
+                  window.location.href = "/product";
+                }
+              });
+            },
+          });
+        }
       });
 
       $("table").on("mouseup keyup", "input[type=number]", () =>
@@ -271,6 +347,43 @@
                 success: function (data) {
                   currentRow.find(".price").val(data[0].id);
                   currentRow.find(".quantity").val(0);
+                },
+                error: function () {},
+              });
+              $.ajax({
+                url:
+                  "http://localhost:8888/api/product/quantity/" +
+                  productDropdown.text(),
+                method: "GET",
+                success: function (data) {
+                  var maxQuantity = data[0].id;
+
+                  if (maxQuantity == 0) {
+                    // Find the parent td, then find or create a span for the out of stock message
+                    var quantityTd = currentRow.find(".quantity").parent();
+                    var outOfStockSpan = quantityTd.find(".out-of-stock");
+                    if (outOfStockSpan.length === 0) {
+                      outOfStockSpan = $("<span>")
+                        .addClass("out-of-stock")
+                        .text("Out of stock")
+                        .css("color", "red");
+                      quantityTd.append(outOfStockSpan);
+                    } else {
+                      outOfStockSpan.show(); // Ensure the out of stock message is visible
+                    }
+                    currentRow.find(".quantity").hide(); // Hide the quantity input
+                  } else {
+                    // If the product is available, set the max quantity and show the input field
+                    currentRow
+                      .find(".quantity")
+                      .attr("max", maxQuantity)
+                      .show();
+                    currentRow
+                      .find(".quantity")
+                      .parent()
+                      .find(".out-of-stock")
+                      .hide();
+                  }
                 },
                 error: function () {},
               });

@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -43,8 +44,23 @@ public class ProductController {
     }
 
     @PostMapping("/payment/save")
-    public ResponseEntity<?> savePayment(@RequestBody List<Payment> product) {
-        return paymentService.save(product);
+    public ResponseEntity<?> savePayment(@RequestBody List<Payment> products) {
+        try {
+            // Update quantity for each product being purchased
+            for (Payment payment : products) {
+                productService.updateQuantity(payment.getQuantity(), payment.getProductName());
+            }
+
+            // Save the payment
+            ResponseEntity<?> response = paymentService.save(products);
+
+            // Return the response
+            return response;
+        } catch (Exception e) {
+            // Handle any exceptions and return an error response
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to save payment: " + e.getMessage());
+        }
     }
 
     @GetMapping("")
@@ -67,6 +83,7 @@ public class ProductController {
         model.addAttribute("payments", payments);
         return "payment/detail";
     }
+
     @GetMapping("/detail/{id}")
     public String detail(@PathVariable Long id, Model model) {
         Optional<Product> products = productRepository.findById(id);

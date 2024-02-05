@@ -14,4 +14,5 @@ public interface PaymentService {
     List<Payment> findAll();
     ResponseEntity<?> all();
     ResponseEntity<String> save(@RequestBody List<Payment> product);
+    
 }

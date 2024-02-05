@@ -21,14 +21,14 @@ public class DropdownController {
     public List<ProductListDto> productList() {
         List<Object[]> list = productRepository.getAll();
         List<ProductListDto> resultList = new ArrayList<>();
-        
+
         for (Object[] data : list) {
             ProductListDto listDto = new ProductListDto();
             listDto.setId((String) data[0]);
             listDto.setProductName((String) data[0]);
             resultList.add(listDto);
         }
-        
+
         return resultList;
     }
 
@@ -36,14 +36,27 @@ public class DropdownController {
     public List<ProductListDto> priceList(@PathVariable String product) {
         List<Object[]> list = productRepository.getPrice(product);
         List<ProductListDto> resultList = new ArrayList<>();
-        
+
         for (Object[] data : list) {
             ProductListDto listDto = new ProductListDto();
             listDto.setId((String) data[0]);
             listDto.setProductName((String) data[0]);
             resultList.add(listDto);
         }
-        
+        return resultList;
+    }
+
+    @GetMapping("/product/quantity/{product}")
+    public List<ProductListDto> quantityList(@PathVariable String product) {
+        List<Object[]> list = productRepository.getQuantity(product);
+        List<ProductListDto> resultList = new ArrayList<>();
+
+        for (Object[] data : list) {
+            ProductListDto listDto = new ProductListDto();
+            listDto.setId(String.valueOf((Long) data[0]));
+            resultList.add(listDto);
+        }
+
         return resultList;
     }
 
