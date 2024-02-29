@@ -18,7 +18,7 @@ import lombok.experimental.FieldDefaults;
 public class User implements Serializable {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id")
+    @Column(name = "id", columnDefinition = "INT AUTO_INCREMENT")
     Long id;
 
     @Column(name = "username")
@@ -27,6 +27,9 @@ public class User implements Serializable {
     @Column(name = "password")
     String password;
 
+    @Column(name = "role")
+    String role;
+
     @Column(name = "is_active")
-    Long is_active;
+    Long isActive;
 }

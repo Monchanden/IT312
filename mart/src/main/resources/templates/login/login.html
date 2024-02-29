@@ -4,7 +4,7 @@
 <head>
     <title>Login Page</title>
     <link rel="shortcut icon" href="https://minimart.com.bd/wp-content/uploads/2023/05/325409173_837305520898040_171445792183026749_n.jpg" type="image/x-icon">
-    
+
     <link th:href="@{/css/account/login.css}" rel="stylesheet" />
 </head>
 
@@ -14,8 +14,8 @@
             <div class="form">
                 <form class="register-form" method="post" action="#" th:action="@{/account/login}" id="form">
                     <h1>Login</h1>
-                    <input type="text" placeholder="username" id="username" required />
-                    <input type="password" placeholder="password" id="password" required />
+                    <input type="text" placeholder="Username" id="username" required />
+                    <input type="password" placeholder="Password" id="password" required />
                     <button type="submit">Login</button>
                 </form>
             </div>
@@ -57,7 +57,7 @@
                     error: function (xhr, status, error) {
                         Swal.fire({
                             icon: "error",
-                            title: "Incorrect username or password!",
+                            title: xhr.responseText,
                             showCancelButton: false,
                             confirmButtonText: "Close"
                         })

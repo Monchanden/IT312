@@ -19,11 +19,27 @@
   </head>
 
   <body>
+    <div id="scanner" style="position: absolute;
+    left: 0%;
+    top:-25%;
+   "></div>
     <section class="actions">
       <a th:href="@{/product}" class="button" style="background-color: red"
         >Back</a
       >
-      <a href="#" id="submit" class="button" style="background-color: red"
+      <a
+        href="#"
+        class="button"
+        type="button"
+        style="background-color: rgb(0, 183, 255)"
+        onclick="print()"
+        >Print</a
+      >
+      <a
+        href="#"
+        id="submit"
+        class="button"
+        style="background-color: rgb(0, 238, 255)"
         >Submit</a
       >
     </section>
@@ -46,10 +62,13 @@
                     style="width: 70px"
                     alt=""
                   />
-                  <input class="invoice_id" type="text" disabled /> <br />Date:
-                  <input class="date" type="text" disabled /> <br />Customer
-                  Name: <b><input class="customer" type="text" /></b>
-                  <br />Cashier: <input class="cashier" type="text" disabled />
+                  <br />Date: <input class="date" type="text" disabled />
+                  <br />Customer Name:
+                  <b
+                    ><input class="customer" type="text" value="Guest" disabled
+                  /></b>
+                  <br />Cashier:
+                  <input class="cashier" type="text" disabled />
                 </td>
               </tr>
             </table>
@@ -80,25 +99,54 @@
           <td>Total</td>
         </tr>
 
-        <tr class="item">
+        <tr class="item hidden">
           <td>
-            <input class="product" value="" />
+            <input class="product" value="" readonly="true" />
           </td>
 
-          <td>$ <input class="price" type="number" value="" /></td>
-
           <td>
-            <input class="quantity" type="number" value="" min="0" />
+            $ <input class="price" type="number" value="" readonly="true" />
           </td>
 
+          <td>
+            <input
+              class="quantity"
+              type="number"
+              value=""
+              min="1"
+              
+            />
+          </td>
           <td>
             <span class="total">$ 00.00</span>
           </td>
         </tr>
 
+        <tr style="display: none">
+          <td colspan="4">
+            <label for="barcodeImageInput" class="file-upload">
+              <i class="fas fa-upload"></i>Scan BarCode with Picture
+            </label>
+            <input
+              type="file"
+              id="barcodeImageInput"
+              accept="image/*"
+              style="display: none"
+            />
+          </td>
+        </tr>
         <tr>
           <td colspan="4">
-            <button class="btn-add-row">Add row</button>
+            <button id="scanButton" class="file-upload" style="font-size: 15px">
+              <i class="fas fa-camera"></i> Scan Barcode with Camera
+            </button>
+            <button
+              id="closeCamera"
+              class="file-upload"
+              style="font-size: 15px; display: none"
+            >
+              <i class="fas fa-camera"></i> Close Camera
+            </button>
           </td>
         </tr>
 
@@ -107,12 +155,156 @@
           <td>Grand Total: $ 00.00</td>
         </tr>
       </table>
-    </div>
-
+    <div id="scanner" style="position: absolute; right: 0%; top: 10%"></div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
     <script src="https://kendo.cdn.telerik.com/2023.3.1114/js/kendo.all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/quagga"></script>
+
     <script>
+      let scanning = false; // Flag to track scanning status
+      let lastScanTime = 0; // Timestamp of the last scan
+      $("#closeCamera").on("click", function () {
+        $(this).hide();
+        $("#scanner").hide();
+        $("#scanButton").show();
+        Quagga.stop();
+      });
+      $("#scanButton").on("click", function () {
+        $("#closeCamera").show();
+        $(this).hide();
+        if (scanning) return; // If scanning is already in progress, do nothing
+        $("#scanner").show();
+        scanning = true; // Set scanning flag to true
+
+Quagga.init(
+  {
+    inputStream: {
+      name: "Live",
+      type: "LiveStream",
+      target: document.querySelector("#scanner"), // Use the div element as the target
+      constraints: {
+        facingMode: "environment", // Use the rear camera of the device
+      },
+    },
+    decoder: {
+      readers: ["ean_reader"], // Specify barcode types to decode (EAN)
+    },
+  },
+  function (err) {
+    if (err) {
+      console.error(err);
+      alert("Error initializing Quagga.");
+      scanning = false; // Reset scanning flag
+      return;
+    }
+    console.log("Quagga initialized successfully.");
+    Quagga.start(); // Start scanning
+    
+    // Set width and height of the video element
+    const videoElement = document.querySelector("#scanner video");
+    videoElement.width = 360; // Set your desired width
+    videoElement.height = 180; // Set your desired height
+  }
+);
+
+
+        // Add listener for scan event
+        Quagga.onDetected(function (result) {
+          let currentTime = new Date().getTime();
+          if (currentTime - lastScanTime < 2000) return; // If less than 0.5 second has passed since the last scan, ignore
+          lastScanTime = currentTime; // Update last scan time
+          let barcode = result.codeResult.code;
+          var audio = new Audio("../../sound/barcode.wav"); // Replace with the path to your sound file
+          audio.play();
+          console.log("Scanned barcode:", barcode);
+          addRow(barcode);
+          scanning = false; // Reset scanning flag
+          // Stop scanning after a barcode is detected (optional)
+        });
+      });
+
+      function addRow(barcode) {
+        // Check if the barcode already exists in any row
+        const existingRow = $(".item").filter(function () {
+          return $(this).data("barcode") === barcode;
+        });
+
+        if (existingRow.length > 0) {
+          const quantityInput = existingRow.find(".quantity");
+          const quantity = parseInt(quantityInput.val()) + 1;
+          quantityInput.val(quantity);
+          calculateTotals();
+          return; // Exit the function since no new row needs to be added
+        }
+
+        // If the barcode doesn't exist, proceed to add a new row
+        const $lastRow = $(".item:last");
+        const $newRow = $lastRow.clone();
+
+        // Remove the hidden class from the cloned row
+        $newRow.removeClass("hidden");
+
+        $newRow.find("input").val("");
+        $newRow.find("td:last").text("$0.00");
+        $newRow.insertAfter($lastRow);
+        const newProductInput = $newRow.find(".product");
+
+        $.ajax({
+          url: "http://localhost:8888/api/product/barcode/" + barcode,
+          method: "GET",
+          success: function (data) {
+            if (data.length > 0) {
+              console.log(data[0].productName);
+              $newRow.find(".barcode").val(barcode);
+              $newRow.find(".product").val(data[0].productName);
+              $newRow.find(".price").val(data[0].unitPrice);
+              $newRow.find(".quantity").val(1);
+              calculateTotals();
+            } else {
+              // No product found with the given barcode, remove the newly added row
+              $newRow.remove();
+            }
+          },
+          error: function () {
+            alert("Error fetching product data");
+          },
+        });
+        newProductInput.focus();
+
+        // Set the barcode as a data attribute for the new row
+        $newRow.data("barcode", barcode);
+      }
+      function scanBarcode() {
+        const input = document.getElementById("barcodeImageInput");
+        const file = input.files[0];
+
+        if (file) {
+          const formData = new FormData();
+          formData.append("image", file);
+
+          fetch("http://localhost:8888/api/scanBarcode", {
+            method: "POST",
+            body: formData,
+          })
+            .then((response) => {
+              if (!response.ok) {
+                throw new Error("Network response was not ok");
+              }
+              return response.text();
+            })
+            .then((data) => {
+              addRow(data);
+            })
+            .catch((error) => {
+              console.error(
+                "There was a problem with the fetch operation:",
+                error
+              );
+              alert("Error scanning barcode");
+            });
+        }
+      }
       function getCurrentDate() {
         const now = new Date();
         const year = now.getFullYear();
@@ -121,86 +313,21 @@
         return `${year}-${month}-${day}`;
       }
 
-      // Set the value of the "Date" input field to the current date
       $(".date").val(getCurrentDate());
       if (!sessionStorage.getItem("username")) {
         window.location.href = "/account/login";
       }
       $(".cashier").val(sessionStorage.getItem("username"));
+      $("#barcodeImageInput").on("change", function () {
+        // Clear the input value to ensure the change event triggers even if the same file is chosen
 
-      var products = $(".product")
-        .kendoDropDownList({
-          optionLabel: "Select product...",
-          dataTextField: "productName",
-          dataValueField: "id",
-          dataSource: [],
-        })
-        .data("kendoDropDownList");
-
-      $(".product").on("change", function () {
-        var currentRow = $(this).closest("tr"); // Get the closest row
-        var productDropdown = currentRow
-          .find(".product")
-          .data("kendoDropDownList");
-        let product = products.value();
-        $.ajax({
-          url: "http://localhost:8888/api/product/price/" + product,
-          method: "GET",
-          success: function (data) {
-            currentRow.find(".price").val(data[0].id);
-            currentRow.find(".quantity").val(0);
-          },
-          error: function () {},
-        });
-        $.ajax({
-          url: "http://localhost:8888/api/product/quantity/" + product,
-          method: "GET",
-          success: function (data) {
-            var maxQuantity = data[0].id;
-
-            if (maxQuantity == 0) {
-              // Find the parent td, then find or create a span for the out of stock message
-              var quantityTd = currentRow.find(".quantity").parent();
-              var outOfStockSpan = quantityTd.find(".out-of-stock");
-              if (outOfStockSpan.length === 0) {
-                outOfStockSpan = $("<span>")
-                  .addClass("out-of-stock")
-                  .text("Out of stock")
-                  .css("color", "red");
-                quantityTd.append(outOfStockSpan);
-              } else {
-                outOfStockSpan.show(); // Ensure the out of stock message is visible
-              }
-              currentRow.find(".quantity").hide(); // Hide the quantity input
-            } else {
-              // If the product is available, set the max quantity and show the input field
-              currentRow.find(".quantity").attr("max", maxQuantity).show();
-              currentRow
-                .find(".quantity")
-                .parent()
-                .find(".out-of-stock")
-                .hide(); // Hide the out of stock message if it was previously displayed
-            }
-          },
-          error: function () {
-            // Handle error if necessary
-          },
-        });
-      });
-
-      $.ajax({
-        url: "http://localhost:8888/api/products",
-        method: "GET",
-        success: function (data) {
-          products.setDataSource(data);
-        },
-        error: function () {},
+        scanBarcode();
+        this.value = "";
       });
 
       $("#submit").on("click", function (e) {
         e.preventDefault();
         var jsonData = [];
-        // Check if customer name is provided
         var customerName = $(".customer").val();
         if (!customerName.trim()) {
           Swal.fire({
@@ -215,58 +342,32 @@
         $("tr.item").each(function () {
           var rowValues = [];
           var $this = $(this);
-          $this.find("input, span").each(function () {
-            var value = $(this).val();
-            if (value) {
-              rowValues.push(value);
-            }
-          });
-          var productName = rowValues[0];
-          var quantity = parseInt(rowValues[2]);
-          var unitPrice = parseFloat(rowValues[1]);
-          var total = unitPrice * quantity;
-          var productID = products.dataSource
-            .data()
-            .find((p) => p.productName === productName).id;
-
-          // Check if the product quantity is sufficient
-          $.ajax({
-            url: "http://localhost:8888/api/product/quantity/" + productID,
-            method: "GET",
-            async: false, // Make the request synchronous to ensure validation completes before proceeding
-            success: function (data) {
-              var maxQuantity = data[0].id;
-              if (maxQuantity < quantity) {
-                Swal.fire({
-                  icon: "error",
-                  title: `Insufficient quantity for ${productName}`,
-                  showCancelButton: false,
-                  confirmButtonText: "OK",
-                });
-                valid = false;
-                return false; // Break the loop if any product has insufficient quantity
+          var productName = $this.find(".product").val().trim(); // Get the product name
+          if (productName) {
+            // Check if product name exists
+            $this.find("input, span").each(function () {
+              var value = $(this).val();
+              if (value) {
+                rowValues.push(value);
               }
-            },
-            error: function () {
-              // Handle error if necessary
-            },
-          });
+            });
+            var quantity = parseInt(rowValues[2]);
+            var unitPrice = parseFloat(rowValues[1]);
+            var total = unitPrice * quantity;
 
-          if (!valid) return false; // Break the loop if any product has insufficient quantity
-
-          var payment = {
-            productName: productName,
-            quantity: quantity,
-            unitPrice: unitPrice,
-            total: total,
-            cashier: sessionStorage.getItem("username"),
-            customerName: $(".customer").val(),
-          };
-          jsonData.push(payment);
+            var payment = {
+              productName: productName,
+              quantity: quantity,
+              unitPrice: unitPrice,
+              total: total,
+              cashier: sessionStorage.getItem("username"),
+              customerName: $(".customer").val(),
+            };
+            jsonData.push(payment);
+          }
         });
 
         if (valid) {
-          // Proceed with payment submission
           $.ajax({
             type: "POST",
             url: "/product/payment/save",
@@ -299,103 +400,6 @@
           });
         }
       });
-
-      $("table").on("mouseup keyup", "input[type=number]", () =>
-        calculateTotals()
-      );
-
-      $(".btn-add-row").on("click", () => {
-        const $lastRow = $(".item:last");
-        const $newRow = $lastRow.clone();
-
-        // Reset input values
-        $newRow.find("input").val("");
-
-        // Reset total value
-        $newRow.find("td:last").text("$0.00");
-
-        // Insert the new row after the last row
-        $newRow.insertAfter($lastRow);
-
-        // Initialize Kendo DropDownList for the product input in the new row
-        const newProductInput = $newRow.find(".product");
-
-        // Get fresh copy of data source
-        $.ajax({
-          url: "http://localhost:8888/api/products",
-          method: "GET",
-          success: function (data) {
-            newProductInput.kendoDropDownList({
-              optionLabel: "Select product...",
-              dataTextField: "productName",
-              dataValueField: "id",
-              dataSource: data,
-            });
-
-            // Add event handler for change event after the DropDownList is initialized
-            newProductInput.on("change", function () {
-              var currentRow = $(this).closest("tr");
-              var productDropdown = currentRow
-                .find(".product")
-                .find(".k-input-value-text");
-
-              $.ajax({
-                url:
-                  "http://localhost:8888/api/product/price/" +
-                  productDropdown.text(),
-                method: "GET",
-                success: function (data) {
-                  currentRow.find(".price").val(data[0].id);
-                  currentRow.find(".quantity").val(0);
-                },
-                error: function () {},
-              });
-              $.ajax({
-                url:
-                  "http://localhost:8888/api/product/quantity/" +
-                  productDropdown.text(),
-                method: "GET",
-                success: function (data) {
-                  var maxQuantity = data[0].id;
-
-                  if (maxQuantity == 0) {
-                    // Find the parent td, then find or create a span for the out of stock message
-                    var quantityTd = currentRow.find(".quantity").parent();
-                    var outOfStockSpan = quantityTd.find(".out-of-stock");
-                    if (outOfStockSpan.length === 0) {
-                      outOfStockSpan = $("<span>")
-                        .addClass("out-of-stock")
-                        .text("Out of stock")
-                        .css("color", "red");
-                      quantityTd.append(outOfStockSpan);
-                    } else {
-                      outOfStockSpan.show(); // Ensure the out of stock message is visible
-                    }
-                    currentRow.find(".quantity").hide(); // Hide the quantity input
-                  } else {
-                    // If the product is available, set the max quantity and show the input field
-                    currentRow
-                      .find(".quantity")
-                      .attr("max", maxQuantity)
-                      .show();
-                    currentRow
-                      .find(".quantity")
-                      .parent()
-                      .find(".out-of-stock")
-                      .hide();
-                  }
-                },
-                error: function () {},
-              });
-            });
-          },
-          error: function () {},
-        });
-
-        // Set focus to the product input in the new row
-        newProductInput.focus();
-      });
-
       function getData() {
         var values = [];
 

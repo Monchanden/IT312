@@ -37,6 +37,11 @@ public class ProductController {
     public String payment() {
         return "payment/index";
     }
+    
+    @GetMapping("/payment/test")
+    public String testpayment() {
+        return "payment/test";
+    }
 
     @GetMapping("/payment/create")
     public String createPayment() {
@@ -46,18 +51,14 @@ public class ProductController {
     @PostMapping("/payment/save")
     public ResponseEntity<?> savePayment(@RequestBody List<Payment> products) {
         try {
-            // Update quantity for each product being purchased
             for (Payment payment : products) {
                 productService.updateQuantity(payment.getQuantity(), payment.getProductName());
             }
 
-            // Save the payment
             ResponseEntity<?> response = paymentService.save(products);
 
-            // Return the response
             return response;
         } catch (Exception e) {
-            // Handle any exceptions and return an error response
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed to save payment: " + e.getMessage());
         }
@@ -72,7 +73,7 @@ public class ProductController {
 
     @GetMapping("/soldproduct")
     public String allSoldProducts(Model model) {
-        List<Payment> payments = paymentRepository.findAll();
+        List<Payment> payments = paymentRepository.findAllByOrderByDateDesc();
         model.addAttribute("payments", payments);
         return "payment/soldproduct";
     }
